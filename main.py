@@ -195,16 +195,46 @@ def display_report(results):
 
 # --- NO CHANGES TO THIS BLOCK ---
 if __name__ == "__main__":
-    print("--- CodeSentinel AI: Starting Full Analysis ---")
-    filepath = 'requirements.txt'
-    dependencies = parse_requirements(filepath)
-    print(f"Found {len(dependencies)} packages to analyze...")
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="CodeSentinel AI Analysis Tool")
+    # ... (argument parsing is the same)
+    parser.add_argument('--file', type=str, default='requirements.txt', help='Path to the requirements file to scan.')
+    parser.add_argument('--ci-mode', action='store_true', help='Enable CI mode for automated checks.')
+    parser.add_argument('--threshold', type=int, default=70, help='In CI mode, fail if any score is below this threshold.')
+    args = parser.parse_args()
+
+    print(f"--- CodeSentinel AI: Analyzing '{args.file}' ---")
+    dependencies = parse_requirements(args.file)
+
     analysis_results = []
     for package in dependencies:
         data = get_package_data(package)
         if data:
-            score, factors = calculate_trust_score(data)
-            result = {"name": package, "score": score, "factors": factors}
-            analysis_results.append(result)
+            # --- FIX IS HERE ---
+            # 1. Get the version from the data
+            version = data.get('info', {}).get('version')
+            # 2. Pass the version to the scoring function
+            score, factors = calculate_trust_score(data, version)
+            analysis_results.append({"name": package, "score": score, "factors": factors})
         time.sleep(0.5)
-    display_report(analysis_results)
+
+    if args.ci_mode:
+        # ... (the rest of the CI logic is the same)
+        print("\n--- Running in CI Mode ---")
+        risky_packages = []
+        for result in analysis_results:
+            if result['score'] < args.threshold:
+                risky_packages.append(result)
+
+        if risky_packages:
+            print(f"!! VULNERABILITY DETECTED: {len(risky_packages)} package(s) below threshold of {args.threshold} !!")
+            for pkg in risky_packages:
+                print(f"  - Package: {pkg['name']}, Score: {pkg['score']}")
+            sys.exit(1)
+        else:
+            print("CI Check Passed: All packages are above the threshold.")
+            sys.exit(0)
+    else:
+        display_report(analysis_results)
