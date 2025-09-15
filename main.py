@@ -129,21 +129,31 @@ def calculate_trust_score(package_data, version):
     package_name = info.get('name', '')
     releases = package_data.get('releases', {})
 
-    # ... (Rules 1-6 are the same as before) ...
+    # ... (Rules 1 & 2 are the same) ...
     if not info.get('author'): score -= 5; risk_factors.append("Missing author name in PyPI metadata.")
     if not info.get('home_page'): score -= 10; risk_factors.append("No project homepage listed.")
+
+    # RULE 3 & 4: Release History (with the fix)
     if releases:
         all_upload_times = []
         for version_files in releases.values():
             for file_info in version_files:
                 upload_time_str = file_info.get('upload_time_iso_8601')
-                if upload_time_str: all_upload_times.append(datetime.fromisoformat(upload_time_str))
+                if upload_time_str:
+                    # --- THIS IS THE FIX ---
+                    # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility
+                    if upload_time_str.endswith('Z'):
+                        upload_time_str = upload_time_str[:-1] + '+00:00'
+                    all_upload_times.append(datetime.fromisoformat(upload_time_str))
+        
         if all_upload_times:
             first_release_date = min(all_upload_times)
             days_since_first_release = (datetime.now(timezone.utc) - first_release_date).days
             if days_since_first_release < 180: score -= 20; risk_factors.append(f"Package is new (created {days_since_first_release} days ago).")
     else: score -= 10; risk_factors.append("No release history found.")
     if len(releases) <= 2: score -= 5; risk_factors.append("Very few versions published.")
+
+    # ... (The rest of the rules are the same) ...
     github_username = extract_github_username(package_data)
     if github_username:
         github_info = get_github_user_info(github_username)
@@ -151,21 +161,21 @@ def calculate_trust_score(package_data, version):
             followers = github_info.get('followers', 0)
             if followers < 20: score -= 15; risk_factors.append(f"GitHub account ({github_username}) has few followers ({followers}).")
             created_at_str = github_info.get('created_at')
-            created_at_date = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-            days_since_creation = (datetime.now(timezone.utc) - created_at_date).days
-            if days_since_creation < 365: score -= 20; risk_factors.append(f"GitHub account ({github_username}) is new ({days_since_creation} days old).")
+            if created_at_str: # Add a check in case created_at is missing
+                if created_at_str.endswith('Z'):
+                    created_at_str = created_at_str[:-1] + '+00:00'
+                created_at_date = datetime.fromisoformat(created_at_str)
+                days_since_creation = (datetime.now(timezone.utc) - created_at_date).days
+                if days_since_creation < 365: score -= 20; risk_factors.append(f"GitHub account ({github_username}) is new ({days_since_creation} days old).")
         else: score -= 10; risk_factors.append(f"Could not verify GitHub username: {github_username}.")
     else: score -= 15; risk_factors.append("No associated GitHub repository found.")
-
-    # --- FINAL REFINED RULE 8: CONTEXT-AWARE STATIC CODE ANALYSIS ---
+    
     code_findings = analyze_source_code(package_name, version)
     if code_findings:
         if package_name in TRUSTED_PACKAGES:
-            # It's a trusted package, so this is a low-risk note, not a critical failure.
             score -= 5 
             risk_factors.append(f"[Note] Potentially risky code patterns found, but this is a trusted package.")
         else:
-            # It's an unknown package, so this is a major red flag.
             score -= 60
             risk_factors.extend(code_findings)
 
