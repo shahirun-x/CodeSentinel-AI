@@ -45,15 +45,15 @@ This is the final, agentic layer that allows CodeSentinel to act autonomously.
 
 ### Rule-Based Analysis Dashboard
 This dashboard provides a detailed breakdown of the 4-layer scan for a project's `requirements.txt`.
-*(Your Screenshot of the first dashboard `app.py` here)*
+
 
 ### AI Predictor Dashboard
 This dashboard allows for on-demand analysis of any single PyPI package using the trained ML model.
-*(Your Screenshot of the second dashboard `ai_dashboard.py` here)*
+
 
 ### Automated CI/CD Integration
 Our GitHub Action provides a fully automated security gate, failing the build if a vulnerability is detected.
-*(Your Screenshot of a failed/successful GitHub Action run here)*
+
 
 ---
 
